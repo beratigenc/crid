@@ -27,7 +27,7 @@ async function boot() {
   const root = createRoot(document.getElementById('root'));
   root.render(<div className="loading"><div className="spin" /><div>CRID başlatılıyor…</div></div>);
   const platform = await initPlatform();
-  if (platform.mode === 'login') { root.render(<LoginPage error={platform.error} />); return; }
+  if (platform.mode === 'login') { root.render(<LoginPage error={platform.error} branding={platform.defaultBranding} />); return; }
   const store = new Store(platform.backend);
   store.start();
   window.__crid = { store, platform };

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { AppCtx, useStoreState, resolveSessionUser, useToasts, useLocalPref, useApp as useAppCtx } from './ctx.jsx';
 import { Icon, Pill, Modal, Field } from './components/common.jsx';
+import { LogoStrip, Watermark, useBranding } from './components/branding.jsx';
 import { buildNotifications, searchCrids, searchIdeas, EMPTY_FILTERS, nameOf } from '../logic/filters.js';
 import { roleDef } from '../logic/rules.js';
 import { todayISO, includesTR } from '../logic/util.js';
@@ -117,6 +118,7 @@ export function App({ store, platform }) {
           <div className="brand">
             <div className="brand-mark">CRID<span aria-hidden="true" /></div>
             <div className="brand-sub">Cost Reduction Ideas Database</div>
+            <SideLogos />
           </div>
           <nav className="nav">
             {NAV.map((n, i) => n.group ? <div className="nav-group" key={'g' + i}>{n.group}</div> : (
@@ -134,6 +136,7 @@ export function App({ store, platform }) {
         </aside>
         {sideOpen ? <div className="overlay" style={{ zIndex: 65, background: 'rgba(0,0,0,.3)' }} onClick={() => setSideOpen(false)} /> : null}
         <div className="main">
+          <AppWatermark />
           <header className="topbar">
             <button className="icon-btn menu-btn" aria-label="Menüyü aç" onClick={() => setSideOpen(true)}><Icon name="menu" /></button>
             <GlobalSearch />
@@ -269,3 +272,6 @@ function PasswordModal({ onClose }) {
     </Modal>
   );
 }
+
+function SideLogos() { const b = useBranding(); return <LogoStrip logos={b.logos} />; }
+function AppWatermark() { const b = useBranding(); return <Watermark branding={b} />; }

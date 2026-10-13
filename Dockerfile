@@ -5,6 +5,7 @@ COPY package.json ./
 COPY server ./server
 COPY src/logic ./src/logic
 COPY dist/index.html ./dist/index.html
+COPY branding ./branding
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 EXPOSE 3000

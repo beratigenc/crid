@@ -6,7 +6,7 @@
 // - Canlı güncelleme: Server-Sent Events
 // - Doküman eki yükleme (DATA_DIR/files)
 import http from 'node:http';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, createReadStream, statSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, createReadStream, statSync, unlinkSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
@@ -89,6 +89,23 @@ function init() {
   flush();
 }
 function strip(o) { const x = { ...o }; delete x.id; return x; }
+
+/* ---------------- kurumsal görünüm ---------------- */
+// Repo içindeki branding/ klasörüne konan logolar, Master Data'da logo yüklenmemişse varsayılan olarak kullanılır.
+const MIME = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+function defaultLogos() {
+  const dir = join(ROOT, 'branding');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((f) => MIME[f.slice(f.lastIndexOf('.')).toLowerCase()]).sort().map((f) => ({
+    id: 'repo-' + f, name: f.replace(/\.[^.]+$/, ''),
+    src: `data:${MIME[f.slice(f.lastIndexOf('.')).toLowerCase()]};base64,${readFileSync(join(dir, f)).toString('base64')}`,
+  }));
+}
+const DEFAULT_LOGOS = defaultLogos();
+function publicBranding() {
+  const b = normalizeMaster(db['master/main']).branding;
+  return { ...b, logos: b.logos.length ? b.logos : DEFAULT_LOGOS, fromRepo: !b.logos.length && DEFAULT_LOGOS.length > 0 };
+}
 
 /* ---------------- oturum ---------------- */
 function parseCookies(req) {
@@ -176,6 +193,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('referrer-policy', 'same-origin');
 
     if (p === '/healthz') return send(res, 200, { ok: true });
+    if (p === '/api/public/branding' && req.method === 'GET') return send(res, 200, publicBranding());
 
     if (p === '/api/login' && req.method === 'POST') {
       const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useApp, useNames, usePerms } from '../ctx.jsx';
 import { Field, Input, NumInput, Select, MultiChips, Tabs, Icon, Pill, Empty, Modal, Confirm, ExportButton, useOptions } from '../components/common.jsx';
 import { History } from './cridDetail.jsx';
+import { LogoStrip, Watermark } from '../components/branding.jsx';
 import { ROLES, PERMISSIONS, DEFAULT_PERMISSION_MATRIX, DEFAULT_STATUSES } from '../../logic/defaults.js';
 import { buildSeed } from '../../logic/seed.js';
 import { buildXlsx, readXlsx, parseCsv } from '../../logic/xlsx.js';
@@ -118,6 +119,7 @@ export function MasterPage({ initialTab }) {
           { value: 'users', label: 'Kullanıcılar & roller', count: draft.users.length },
           { value: 'perms', label: 'Yetki matrisi' },
           { value: 'settings', label: 'Sistem parametreleri' },
+          { value: 'branding', label: 'Kurumsal görünüm' },
           { value: 'sap', label: 'SAP / Entegrasyon' },
           { value: 'data', label: 'Veri' },
           { value: 'history', label: 'Değişiklik geçmişi' },
@@ -162,6 +164,7 @@ export function MasterPage({ initialTab }) {
             <Field label="Devreye girişte Add/Delete dondurma"><Select value={draft.settings.autoFreezeOnSop === false ? 'no' : 'yes'} onChange={(v) => updSettings('autoFreezeOnSop')(v === 'yes')} options={[{ value: 'yes', label: 'Otomatik dondur' }, { value: 'no', label: 'Dondurma' }]} disabled={!canMaster} aria-label="Dondurma" /></Field>
             <Field label="Otomatik statü ilerletme"><Select value={draft.settings.autoStatus === false ? 'no' : 'yes'} onChange={(v) => updSettings('autoStatus')(v === 'yes')} options={[{ value: 'yes', label: 'Açık' }, { value: 'no', label: 'Kapalı' }]} disabled={!canMaster} aria-label="Otomatik statü" /></Field>
           </div> : null}
+          {tab === 'branding' ? <BrandingTab draft={draft} upd={upd} disabled={!canMaster} /> : null}
           {tab === 'sap' ? <SapTab draft={draft} upd={upd} disabled={!canInt} /> : null}
           {tab === 'data' ? <DataTab /> : null}
           {tab === 'history' ? <History items={state.master.history} exportName="Master_Data" /> : null}
@@ -368,6 +371,74 @@ function DataTab() {
         onConfirm={async () => { await store.removeSampleData(); toast('Örnek veri kaldırıldı', 'good'); }} /> : null}
       {confirm === 'load' ? <Confirm title="Örnek veriyi yükle" confirmLabel="Yükle" onClose={() => setConfirm(null)} message="Referans görsellerden türetilmiş örnek araçlar, üretim planı, CRID'ler ve havuz fikirleri yüklenecek."
         onConfirm={async () => { await store.loadSeed(buildSeed()); toast('Örnek veri yüklendi', 'good'); }} /> : null}
+    </div>
+  );
+}
+
+const LOGO_TYPES = ['image/png', 'image/svg+xml', 'image/jpeg', 'image/webp'];
+function readAsDataUrl(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Dosya okunamadı')); r.readAsDataURL(file); });
+}
+function BrandingTab({ draft, upd, disabled }) {
+  const { toast, platform } = useApp();
+  const b = draft.branding || { logos: [], watermark: true, opacity: 0.07, watermarkSize: 260 };
+  const set = (patch) => upd('branding')({ ...b, ...patch });
+  const maxKb = platform.mode === 'claude' ? 90 : 600;
+  const repoDefault = !b.logos.length && platform.defaultBranding?.logos?.length ? platform.defaultBranding.logos : null;
+  const shown = b.logos.length ? b.logos : repoDefault || [];
+  const add = async (files) => {
+    const next = b.logos.slice();
+    for (const f of files) {
+      if (!LOGO_TYPES.includes(f.type)) { toast(`${f.name}: yalnız PNG, SVG, JPG veya WebP yüklenebilir.`, 'bad'); continue; }
+      if (f.size > maxKb * 1024) { toast(`${f.name}: dosya ${maxKb} KB sınırını aşıyor. Daha küçük bir sürüm (ör. SVG veya 600 px genişlikte PNG) yükleyin.`, 'bad'); continue; }
+      next.push({ id: uid('logo-'), name: f.name.replace(/\.[^.]+$/, ''), src: await readAsDataUrl(f) });
+    }
+    if (next.length !== b.logos.length) { set({ logos: next }); toast('Logo eklendi — kaydetmeyi unutmayın', 'good'); }
+  };
+  const move = (i, d) => { const l = b.logos.slice(); const j = i + d; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; set({ logos: l }); };
+  return (
+    <div className="grid g2">
+      <div className="stack" style={{ gap: 14 }}>
+        <p className="muted" style={{ margin: 0 }}>Kurum logolarını yükleyin. Logolar giriş ekranında, sol menünün üstünde ve tüm ekranların arka planında soluk filigran olarak görünür. Resmi logo dosyalarını kurumsal iletişim biriminden alın; şeffaf arka planlı PNG veya SVG en iyi sonucu verir.</p>
+        {repoDefault ? <div className="banner info">Şu an sunucuda tanımlı varsayılan logolar kullanılıyor. Buradan yüklediğiniz logolar onların yerine geçer.</div> : null}
+        {!disabled ? (
+          <label className="drop" style={{ cursor: 'pointer' }}>
+            <b>Logo dosyası seç</b>
+            <div className="small">PNG, SVG, JPG veya WebP · en fazla {maxKb} KB</div>
+            <input type="file" hidden multiple accept=".png,.svg,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/jpeg,image/webp" aria-label="Logo dosyası" onChange={(e) => { add([...e.target.files]); e.target.value = ''; }} />
+          </label>
+        ) : null}
+        {b.logos.length ? (
+          <table className="tbl" data-testid="logo-table"><thead><tr><th>Logo</th><th>Ad</th><th /></tr></thead><tbody>
+            {b.logos.map((l, i) => (
+              <tr key={l.id}>
+                <td style={{ background: '#fff', width: 140 }}><img src={l.src} alt={l.name} style={{ maxHeight: 36, maxWidth: 120 }} /></td>
+                <td><input className="inp sm" value={l.name} disabled={disabled} aria-label="Logo adı" onChange={(e) => set({ logos: b.logos.map((x) => (x.id === l.id ? { ...x, name: e.target.value } : x)) })} /></td>
+                <td className="nowrap num">{!disabled ? <>
+                  <button className="btn sm ghost" aria-label="Yukarı taşı" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
+                  <button className="btn sm ghost" aria-label="Aşağı taşı" onClick={() => move(i, 1)} disabled={i === b.logos.length - 1}>↓</button>
+                  <button className="btn sm ghost" aria-label={`${l.name} kaldır`} onClick={() => set({ logos: b.logos.filter((x) => x.id !== l.id) })}><Icon name="trash" /></button>
+                </> : null}</td>
+              </tr>
+            ))}
+          </tbody></table>
+        ) : !repoDefault ? <Empty title="Henüz logo yüklenmedi" /> : null}
+        <div className="form-grid">
+          <Field label="Arka plan filigranı"><Select value={b.watermark === false ? 'no' : 'yes'} onChange={(v) => set({ watermark: v === 'yes' })} options={[{ value: 'yes', label: 'Göster' }, { value: 'no', label: 'Gizle' }]} disabled={disabled} aria-label="Filigran" /></Field>
+          <Field label={`Filigran yoğunluğu (%${Math.round((+b.opacity || 0.07) * 100)})`} htmlFor="wm-op"><input id="wm-op" type="range" min="0.02" max="0.25" step="0.01" value={b.opacity ?? 0.07} disabled={disabled} onChange={(e) => set({ opacity: +e.target.value })} /></Field>
+          <Field label={`Filigran boyutu (${b.watermarkSize || 260} px)`} htmlFor="wm-sz"><input id="wm-sz" type="range" min="140" max="480" step="10" value={b.watermarkSize || 260} disabled={disabled} onChange={(e) => set({ watermarkSize: +e.target.value })} /></Field>
+        </div>
+      </div>
+      <div className="stack">
+        <b>Önizleme</b>
+        <div className="brand-preview">
+          <Watermark branding={{ ...b, logos: shown, watermarkSize: Math.round((b.watermarkSize || 260) * 0.6) }} />
+          <div style={{ background: 'var(--ink)', color: 'var(--ink-text)', borderRadius: 6, padding: '12px 14px', maxWidth: 240 }}>
+            <div className="brand-mark" style={{ fontSize: 20 }}>CRID<span aria-hidden="true" /></div>
+            <LogoStrip logos={shown} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

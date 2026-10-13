@@ -119,6 +119,7 @@ export function defaultMaster() {
     permissions: JSON.parse(JSON.stringify(DEFAULT_PERMISSION_MATRIX)),
     settings: { ...DEFAULT_SETTINGS },
     sap: { endpoint: '', client: '', system: '', mode: 'manual', notes: '', lastImports: [] },
+    branding: { logos: [], watermark: true, opacity: 0.07, watermarkSize: 220 },
     history: [],
   };
 }
@@ -130,6 +131,8 @@ export function normalizeMaster(m) {
   out.settings = { ...d.settings, ...((m && m.settings) || {}) };
   out.permissions = { ...d.permissions, ...((m && m.permissions) || {}) };
   out.sap = { ...d.sap, ...((m && m.sap) || {}) };
+  out.branding = { ...d.branding, ...((m && m.branding) || {}) };
+  if (!Array.isArray(out.branding.logos)) out.branding.logos = [];
   // statü listesinde eksik anahtar kalmasın
   const st = Array.isArray(out.statuses) ? out.statuses : [];
   out.statuses = STATUS_KEYS.map((k) => st.find((s) => s.key === k) || DEFAULT_STATUSES.find((s) => s.key === k));

@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { LogoStrip, Watermark } from '../components/branding.jsx';
 
-export function LoginPage({ error: initialError }) {
+export function LoginPage({ error: initialError, branding }) {
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [err, setErr] = useState(initialError || '');
@@ -17,10 +18,12 @@ export function LoginPage({ error: initialError }) {
   };
   return (
     <div className="login-wrap">
+      <Watermark branding={branding} />
       <form className="login-card" onSubmit={submit}>
         <div className="login-brand">
           <div className="brand-mark">CRID<span aria-hidden="true" /></div>
           <div className="brand-sub">Cost Reduction Ideas Database</div>
+          <LogoStrip logos={branding?.logos} />
         </div>
         <div className="login-body">
           <h1>Giriş yap</h1>

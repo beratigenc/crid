@@ -19,6 +19,12 @@ Maliyet azaltma fikirleri, Add/Delete listeleri, üretim planı, bütçe, milest
 
 Yönetici şifresini unutursanız: `ADMIN_PASSWORD`'a yeni şifreyi yazıp `ADMIN_RESET=true` ekleyin, yeniden başlatın, sonra `ADMIN_RESET`'i kaldırın.
 
+## Kurumsal görünüm (logolar)
+
+Master Data → **Kurumsal görünüm** ekranından IT yöneticisi kurum logolarını yükler; logolar giriş ekranında, sol menüde ve
+tüm ekranların arka planında soluk filigran olarak görünür. Yoğunluk ve boyut aynı ekrandan ayarlanır. Repodaki `branding/`
+klasörüne konan logolar varsayılan olarak kullanılır.
+
 ## Yerelde çalıştırma
 
 ```

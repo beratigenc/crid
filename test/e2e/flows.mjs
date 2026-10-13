@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const SCR = '/tmp/claude-0/-home-claude/9050dcd1-0ede-5808-8df8-d1f3fabc05a6/scratchpad/';
+const SCR = '/tmp/claude-0/-home-claude-crid/9050dcd1-0ede-5808-8df8-d1f3fabc05a6/scratchpad/';
 const html = readFileSync('dist/test.html');
 const srv = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(html); }).listen(0);
 const URL = `http://localhost:${srv.address().port}/`;

@@ -367,3 +367,20 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .login-brand { background: var(--ink); color: var(--ink-text); padding: 22px 24px 18px; }
 .login-brand .brand-sub { color: var(--ink-muted); }
 .login-body { padding: 22px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- kurumsal görünüm ---------- */
+.logo-strip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #fff; border-radius: 6px; padding: 8px 10px; margin-top: 12px; }
+.logo-strip img { max-height: 30px; max-width: 46%; width: auto; object-fit: contain; }
+.login-brand .logo-strip { margin-top: 14px; }
+.login-brand .logo-strip img { max-height: 40px; }
+.main { position: relative; isolation: isolate; }
+.watermark { position: fixed; inset: 0 0 0 var(--side-w); z-index: -1; pointer-events: none; overflow: hidden; }
+.watermark .wm-inner { position: absolute; inset: -30% -20%; display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--wm-size), 1fr)); gap: calc(var(--wm-size) * .35) calc(var(--wm-size) * .3); align-content: start; justify-items: center; transform: rotate(-16deg); opacity: var(--wm-opacity); filter: grayscale(1); }
+.watermark img { width: calc(var(--wm-size) * .72); height: calc(var(--wm-size) * .32); object-fit: contain; }
+:root[data-theme="dark"] .watermark .wm-inner { filter: grayscale(1) invert(1); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .watermark .wm-inner { filter: grayscale(1) invert(1); } }
+.login-wrap { position: relative; isolation: isolate; }
+.login-wrap .watermark { inset: 0; }
+@media (max-width: 860px) { .watermark { inset: 0; } }
+.brand-preview { border: 1px dashed var(--line-strong); border-radius: var(--radius); padding: 14px; background: var(--bg); position: relative; min-height: 220px; overflow: hidden; isolation: isolate; }
+.brand-preview .watermark { position: absolute; inset: 0; }

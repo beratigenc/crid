@@ -60,17 +60,22 @@ function saveLocal(filename, data) {
   return Promise.resolve(true);
 }
 
+export async function fetchPublicBranding() {
+  try { const r = await fetch('/api/public/branding'); return r.ok ? await r.json() : null; } catch (e) { return null; }
+}
+
 async function serverPlatform() {
+  const defaultBranding = await fetchPublicBranding();
   let me;
   try {
     const r = await fetch('/api/me', { credentials: 'same-origin' });
-    if (r.status === 401) return { mode: 'login' };
+    if (r.status === 401) return { mode: 'login', defaultBranding };
     me = (await r.json()).user;
-  } catch (e) { return { mode: 'login', error: 'Sunucuya ulaşılamadı.' }; }
+  } catch (e) { return { mode: 'login', error: 'Sunucuya ulaşılamadı.', defaultBranding }; }
   const backend = new HttpBackend('');
   backend.onAuthLost = () => { location.reload(); };
   return {
-    mode: 'server', backend, viewer: { id: me.id, name: me.name, username: me.username, canWrite: me.role !== 'readonly' },
+    mode: 'server', defaultBranding, backend, viewer: { id: me.id, name: me.name, username: me.username, canWrite: me.role !== 'readonly' },
     saveFile: (filename, data) => saveLocal(filename, data),
     upload: async (file) => {
       const r = await fetch('/api/upload', { method: 'POST', body: file, headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(file.name) }, credentials: 'same-origin' });
