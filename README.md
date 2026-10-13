@@ -25,7 +25,7 @@ Yönetici şifresini unutursanız: `ADMIN_PASSWORD`'a yeni şifreyi yazıp `ADMI
 ADMIN_PASSWORD=Sifre1234 npm start   # http://localhost:3000
 ```
 
-Bağımlılık yoktur (Node.js 20+). Arayüz `dist/index.html` içinde derlenmiş hâlde gelir; kaynak `src/` altındadır (`npm run build` esbuild + React gerektirir).
+Bağımlılık yoktur (Node.js 20+). Arayüz `dist/index.html` içinde derlenmiş hâlde gelir; kaynak `src/` altındadır (`npm run build:ui` esbuild + React gerektirir).
 
 ## Mimari
 

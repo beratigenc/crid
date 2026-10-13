@@ -4,10 +4,12 @@
   "private": true,
   "description": "CRID — Cost Reduction Ideas Database: maliyet azaltma fikirleri, bütçe ve proje takip sistemi",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server/server.mjs",
-    "build": "node build.mjs",
+    "build:ui": "node build.mjs",
     "test:unit": "node --test test/unit/*.test.mjs",
     "test:e2e": "node test/e2e/flows.mjs && node test/e2e/server.mjs"
   }
