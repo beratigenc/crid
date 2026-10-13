@@ -29,6 +29,14 @@ cpSync('dist/index.html', join(APP2, 'dist/index.html'));
 cpSync('package.json', join(APP2, 'package.json'));
 cpSync(join(TMP, 'test-a.svg'), join(APP2, 'branding/01-test-a.svg'));
 
+// logosuz senaryo için branding/ klasörü olmayan kopya
+const APP1 = join(TMP, 'app1');
+mkdirSync(join(APP1, 'src'), { recursive: true }); mkdirSync(join(APP1, 'dist'), { recursive: true });
+cpSync('server', join(APP1, 'server'), { recursive: true });
+cpSync('src/logic', join(APP1, 'src/logic'), { recursive: true });
+cpSync('dist/index.html', join(APP1, 'dist/index.html'));
+cpSync('package.json', join(APP1, 'package.json'));
+
 const procs = [];
 function start(cwd, port, data) {
   return new Promise((resolve, reject) => {
@@ -40,7 +48,7 @@ function start(cwd, port, data) {
   });
 }
 const A = 'http://localhost:3941', B = 'http://localhost:3942';
-let srvA = await start(process.cwd(), 3941, join(TMP, 'dA'));
+let srvA = await start(APP1, 3941, join(TMP, 'dA'));
 await start(APP2, 3942, join(TMP, 'dB'));
 
 const browser = await chromium.launch();
@@ -138,9 +146,15 @@ await step('Telefonda yatay taşma yok', async () => {
 });
 await step('Sunucu yeniden başlayınca logolar korunur', async () => {
   await new Promise((r) => { srvA.once('exit', r); srvA.kill('SIGTERM'); });
-  srvA = await start(process.cwd(), 3941, join(TMP, 'dA'));
+  srvA = await start(APP1, 3941, join(TMP, 'dA'));
   const pub = await (await fetch(A + '/api/public/branding')).json();
   assert.equal(pub.logos.length, 2);
+});
+await step('Repodaki Otokar logosu varsayılan olarak yüklenir', async () => {
+  const srvR = await start(process.cwd(), 3943, join(TMP, 'dR'));
+  const pub = await (await fetch('http://localhost:3943/api/public/branding')).json();
+  assert.ok(pub.logos.some((l) => /otokar/i.test(l.name)) && pub.fromRepo);
+  srvR.kill('SIGTERM');
 });
 await step('Repodaki branding/ klasörü varsayılan logo olur', async () => {
   const pub = await (await fetch(B + '/api/public/branding')).json();
