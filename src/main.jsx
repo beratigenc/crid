@@ -4,6 +4,7 @@ import { App } from './ui/app.jsx';
 import { Store } from './store/store.js';
 import { initPlatform } from './ui/platform.js';
 import { LoginPage } from './ui/pages/login.jsx';
+import { HtmlLoginPage } from './ui/pages/htmlLogin.jsx';
 
 class Boundary extends Component {
   constructor(p) { super(p); this.state = { err: null }; }
@@ -28,6 +29,7 @@ async function boot() {
   root.render(<div className="loading"><div className="spin" /><div>CRID başlatılıyor…</div></div>);
   const platform = await initPlatform();
   if (platform.mode === 'login') { root.render(<LoginPage error={platform.error} branding={platform.defaultBranding} />); return; }
+  if (platform.mode === 'html-login') { root.render(<HtmlLoginPage platform={platform} />); return; }
   const store = new Store(platform.backend);
   store.start();
   window.__crid = { store, platform };

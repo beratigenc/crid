@@ -5,10 +5,11 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const SCR = '/tmp/claude-0/-home-claude-crid/9050dcd1-0ede-5808-8df8-d1f3fabc05a6/scratchpad/';
+const SCR = '/tmp/claude-0/-home-claude/9050dcd1-0ede-5808-8df8-d1f3fabc05a6/scratchpad/';
 const html = readFileSync('dist/test.html');
 const srv = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(html); }).listen(0);
-const URL = `http://localhost:${srv.address().port}/`;
+const OFFLINE = !!process.env.OFFLINE;
+const URL = OFFLINE ? 'file://' + process.cwd() + '/dist/crid-offline.html' : `http://localhost:${srv.address().port}/`;
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 950 }, acceptDownloads: true });
 const page = await ctx.newPage();
@@ -34,8 +35,9 @@ const dialog = () => page.getByRole('dialog').last();
 const state = () => page.evaluate(() => window.__crid.store.getState());
 
 await page.goto(URL);
-await page.evaluate(() => { localStorage.clear(); });
+await page.evaluate(async () => { localStorage.clear(); await new Promise((r) => { const q = indexedDB.deleteDatabase('crid-offline'); q.onsuccess = q.onerror = q.onblocked = () => r(); }); });
 await page.goto(URL);
+if (OFFLINE) { await page.waitForSelector('#hl-u'); await page.selectOption('#hl-u', 'usr-zeynep'); await page.getByRole('button', { name: 'Devam' }).click(); }
 await page.waitForSelector('h1');
 
 console.log('Fikir Havuzu → CRID');
@@ -63,7 +65,7 @@ await step('Fikir Oluşturucu yeni fikir açar', async () => {
   ideaNo = t.match(/FH-\d{4}-\d{4}/)[0];
   assert.equal(ideaNo, 'FH-2026-0011');
   const s = await state();
-  assert.ok(s.ideas.find((i) => i.no === ideaNo && i.createdBy === 'usr-burak'));
+  assert.ok(s.ideas.find((i) => i.no === ideaNo && i.createdBy === (OFFLINE ? 'usr-zeynep' : 'usr-burak')));
 });
 
 await step('Salt okuma kullanıcısı kayıt açamaz, dışa aktaramaz', async () => {
@@ -240,7 +242,7 @@ await step('CRID Sorumlusu teyit veremez; Finansal Kontrol teyit verir', async (
   assert.match(await toastText(), /teyit verildi/);
   const c = (await state()).crids.find((x) => x.id === cridId);
   assert.equal(c.fin.status, 'confirmed');
-  assert.equal(c.fin.by, 'usr-elif');
+  assert.equal(c.fin.by, OFFLINE ? 'usr-zeynep' : 'usr-elif'); // çevrimdışında önizleme, işlemi gerçek kullanıcı adına yazar
   assert.equal(c.fin.confirmedAmount, 850);
   assert.equal(c.status, 'finconf');
 });

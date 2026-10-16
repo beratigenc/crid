@@ -1,6 +1,7 @@
 // claude.ai artifact çalışma zamanı ile köprü. Yetenek yoksa yerel (demo) moda düşer.
 import { ClaudeBackend, LocalBackend, HttpBackend } from '../store/backends.js';
 import { buildSeed } from '../logic/seed.js';
+import { OfflineBackend, fileApiSupported } from '../store/offline.js';
 
 function withTimeout(p, ms) {
   return Promise.race([p, new Promise((r) => setTimeout(() => r(null), ms))]);
@@ -8,6 +9,7 @@ function withTimeout(p, ms) {
 
 export async function initPlatform() {
   if (typeof window !== 'undefined' && window.__CRID_SERVER__) return serverPlatform();
+  if (typeof window !== 'undefined' && window.__CRID_HTML__) return htmlPlatform();
   const claude = typeof window !== 'undefined' ? window.claude : null;
   const hasRuntime = !!(claude && typeof claude.use === 'function');
   if (!hasRuntime || window.__CRID_FORCE_LOCAL__) return localPlatform('no-runtime');
@@ -95,4 +97,42 @@ async function serverPlatform() {
       remove: async (username) => { const r = await fetch('/api/accounts/' + encodeURIComponent(username), { method: 'DELETE', credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Silinemedi'); },
     },
   };
+}
+
+/* ---------- tek dosya HTML (çevrimdışı) ---------- */
+const HTML_USER_KEY = 'crid-html-user';
+export function htmlRememberedUser() { try { return localStorage.getItem(HTML_USER_KEY) || ''; } catch (e) { return ''; } }
+export function htmlRememberUser(id) { try { if (id) localStorage.setItem(HTML_USER_KEY, id); else localStorage.removeItem(HTML_USER_KEY); } catch (e) { /* */ } }
+
+async function htmlPlatform() {
+  const backend = new OfflineBackend({ seed: buildSeed() });
+  await backend.ready;
+  const userId = htmlRememberedUser();
+  const master = backend.pack.docs['master/main'];
+  const exists = master && (master.users || []).some((u) => u.id === userId && u.active !== false);
+  const base = {
+    backend, fileApi: fileApiSupported(), defaultBranding: { logos: (typeof window !== 'undefined' && window.__CRID_DEFAULT_LOGOS__) || [] },
+    saveFile: (filename, data) => saveLocal(filename, data),
+    upload: async (file) => {
+      if (file.size > 3 * 1024 * 1024) throw new Error(`${file.name}: çevrimdışı sürümde dosya başına en fazla 3 MB eklenebilir. Büyük dosyalar için ortak klasördeki bağlantısını ekleyin.`);
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Dosya okunamadı')); r.readAsDataURL(file); });
+      return { id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), url, sizeBytes: file.size, contentType: file.type };
+    },
+    logout: () => { htmlRememberUser(''); try { history.replaceState(null, '', location.pathname); } catch (e) { /* */ } location.reload(); },
+  };
+  if (!exists) return { ...base, mode: 'html-login' };
+  const u = master.users.find((x) => x.id === userId);
+  return { ...base, mode: 'html', viewer: { id: u.id, name: u.name, canWrite: u.role !== 'readonly' } };
+}
+
+/** PIN özeti (SHA-256; yoksa basit yedek). */
+export async function pinHash(userId, pin) {
+  const text = `crid:${userId}:${pin}`;
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return 'f' + (h >>> 0).toString(16);
+  }
 }

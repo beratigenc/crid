@@ -17,7 +17,7 @@ export function resolveSessionUser({ platform, master, previewUserId }) {
     const u = users.find((x) => x.id === previewUserId) || users.find((x) => x.role === 'it') || users[0];
     return u ? { ...u, real: u, canPreview: true } : { id: 'demo', name: 'Demo Kullanıcı', role: 'it', canPreview: true };
   }
-  if (platform.mode === 'server') {
+  if (platform.mode === 'server' || platform.mode === 'html') {
     const v = platform.viewer || {};
     const u = users.find((x) => x.id === v.id) || { id: v.id, name: v.name || 'Kullanıcı', role: 'readonly' };
     const real = { ...u };

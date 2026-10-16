@@ -2,6 +2,13 @@
 
 Maliyet azaltma fikirleri, Add/Delete listeleri, üretim planı, bütçe, milestone ve finansal kontrol takibi için web uygulaması.
 
+## Çevrimdışı tek dosya sürümü (önerilen: iş bilgisayarı)
+
+`dist/crid-offline.html` dosyası sunucu ve internet gerektirmez; çift tıklayınca Edge/Chrome'da açılır.
+Veriler o bilgisayarın tarayıcısında saklanır. Master Data → Veri ekranından ortak klasörde bir `.json`
+veri dosyası bağlanırsa her değişiklik dosyaya yazılır ve aynı dosyayı kullanan kişilerin değişiklikleri
+kayıt bazında birleştirilir. Yedek indirme / geri yükleme aynı ekrandadır.
+
 ## Railway'e kurulum
 
 1. Railway'de **New Project → Deploy from GitHub repo** ile bu repoyu seçin.

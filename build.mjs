@@ -30,3 +30,21 @@ const full = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta n
 writeFileSync('dist/test.html', full);
 writeFileSync('dist/index.html', full);
 console.log(`crid.html ${(Buffer.byteLength(head + body) / 1024).toFixed(0)} KB`);
+
+// Çevrimdışı tek dosya sürümü: sunucu/internet gerektirmez, harici kaynak yüklemez.
+{
+  const { readdirSync } = await import('node:fs');
+  const MIME = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+  let logos = [];
+  try {
+    logos = readdirSync('branding').filter((f) => MIME[f.slice(f.lastIndexOf('.')).toLowerCase()]).sort().map((f) => ({
+      id: 'repo-' + f, name: f.replace(/\.[^.]+$/, '').replace(/^\d+-/, ''),
+      src: `data:${MIME[f.slice(f.lastIndexOf('.')).toLowerCase()]};base64,${readFileSync('branding/' + f).toString('base64')}`,
+    }));
+  } catch (e) { /* branding yok */ }
+  const offlineHead = head.replace(/<link[^>]*fonts\.(googleapis|gstatic)[^>]*>/g, '').replace('<title>CRID Portföy Takibi</title>', '<title>CRID — Maliyet Azaltma Portföyü</title>');
+  const flags = `<script>window.__CRID_HTML__=true;window.__CRID_DEFAULT_LOGOS__=${JSON.stringify(logos).replace(/</g, '\\u003c')};</script>`;
+  const offline = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>[hidden]{display:none!important}body{margin:0}</style>${offlineHead}${flags}</head><body>${body}</body></html>`;
+  writeFileSync('dist/crid-offline.html', offline);
+  console.log(`crid-offline.html ${(Buffer.byteLength(offline) / 1024).toFixed(0)} KB, logo: ${logos.length}`);
+}

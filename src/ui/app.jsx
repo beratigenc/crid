@@ -130,7 +130,7 @@ export function App({ store, platform }) {
             ))}
           </nav>
           <div className="side-foot">
-            {platform.mode === 'claude' || platform.mode === 'server' ? 'Canlı veritabanı · paylaşımlı' : 'Demo modu · tarayıcıda saklanır'}
+            {platform.mode === 'html' ? <StorageFoot /> : platform.mode === 'claude' || platform.mode === 'server' ? 'Canlı veritabanı · paylaşımlı' : 'Demo modu · tarayıcıda saklanır'}
             <br />SAP entegrasyonu: şablonla içe aktarım
           </div>
         </aside>
@@ -141,6 +141,7 @@ export function App({ store, platform }) {
             <button className="icon-btn menu-btn" aria-label="Menüyü aç" onClick={() => setSideOpen(true)}><Icon name="menu" /></button>
             <GlobalSearch />
             <div className="top-actions">
+              {platform.mode === 'html' ? <StorageChip /> : null}
               <button className="icon-btn" aria-label={`Bildirimler (${notifications.length})`} onClick={() => nav('notifications')}>
                 <Icon name="bell" />{notifications.length ? <span className="dot">{notifications.length > 99 ? '99+' : notifications.length}</span> : null}
               </button>
@@ -236,6 +237,7 @@ function UserChip() {
             <div><b>{session.real?.name || session.name}</b></div>
             <div className="small muted">{roleDef(session.real?.role || session.role).desc}</div>
           </div>
+          {platform.mode === 'html' ? <button role="menuitem" onClick={() => platform.logout()}>Kullanıcı değiştir</button> : null}
           {platform.mode === 'server' ? <>
             <button role="menuitem" onClick={() => { setOpen(false); setPwOpen(true); }}>Şifremi değiştir</button>
             <button role="menuitem" onClick={() => platform.logout()}>Çıkış yap</button>
@@ -275,3 +277,22 @@ function PasswordModal({ onClose }) {
 
 function SideLogos() { const b = useBranding(); return <LogoStrip logos={b.logos} />; }
 function AppWatermark() { const b = useBranding(); return <Watermark branding={b} />; }
+
+function useStorageStatus() {
+  const { platform } = useAppCtx();
+  const [st, setSt] = useState(() => platform.backend?.file || { status: 'none' });
+  useEffect(() => platform.backend?.onStatus ? platform.backend.onStatus(setSt) : undefined, [platform]);
+  return st;
+}
+function StorageFoot() {
+  const st = useStorageStatus();
+  return st.status === 'none' ? 'Çevrimdışı · veriler bu bilgisayarda' : `Veri dosyası: ${st.name}`;
+}
+function StorageChip() {
+  const { platform, nav, toast } = useAppCtx();
+  const st = useStorageStatus();
+  if (st.status === 'ok') return <button className="btn sm ghost" data-testid="storage-chip" title={`Son eşitleme: ${st.lastSync ? new Date(st.lastSync).toLocaleTimeString('tr-TR') : '—'}`} onClick={() => nav('master', { tab: 'data' })}><Icon name="db" /> {st.name}</button>;
+  if (st.status === 'needs-permission') return <button className="btn sm" data-testid="storage-chip" style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }} onClick={async () => { try { await platform.backend.reauthorize(); toast('Veri dosyasına yeniden bağlanıldı', 'good'); } catch (e) { toast(e.message, 'bad'); } }}><Icon name="db" /> Veri dosyasına bağlanmak için tıklayın</button>;
+  if (st.status === 'error') return <button className="btn sm danger" data-testid="storage-chip" title={st.error} onClick={() => nav('master', { tab: 'data' })}><Icon name="db" /> Veri dosyası hatası</button>;
+  return <button className="btn sm ghost" data-testid="storage-chip" onClick={() => nav('master', { tab: 'data' })} title="Veriler bu bilgisayarın tarayıcısında saklanıyor"><Icon name="db" /> Bu bilgisayarda</button>;
+}

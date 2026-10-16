@@ -7,6 +7,7 @@ import { ROLES, PERMISSIONS, DEFAULT_PERMISSION_MATRIX, DEFAULT_STATUSES } from 
 import { buildSeed } from '../../logic/seed.js';
 import { buildXlsx, readXlsx, parseCsv } from '../../logic/xlsx.js';
 import { clone, uid, num, fmtDateTime, fmtDate, includesTR } from '../../logic/util.js';
+import { pinHash } from '../platform.js';
 
 const TONES = ['neutral', 'info', 'accent', 'good', 'bad', 'warn', 'done', 'muted'].map((t) => ({ value: t, label: t }));
 
@@ -258,6 +259,7 @@ function UsersTab({ draft, upd, disabled }) {
     <div className="stack">
       <p className="muted" style={{ margin: 0 }}>Kullanıcılar sorumlu seçimlerinde ve rol bazlı yetkide kullanılır. {platform.mode === 'server' ? 'Kişiyi listeye ekleyip kaydedin, ardından "Giriş hesapları" bölümünden kullanıcı adı ve şifre tanımlayın.' : platform.mode === 'claude' ? 'Uygulamayı açan kişiler aşağıdaki "Bekleyen" listesine düşer; rol atayarak ekleyin.' : 'Demo modunda sağ üstteki menüden kullanıcı değiştirerek rolleri deneyebilirsiniz.'} Kategori Yöneticisi yalnız seçili kategorilerdeki kayıtları düzenleyebilir.</p>
       {platform.mode === 'server' ? <AccountsPanel draft={draft} disabled={disabled} /> : null}
+      {platform.mode === 'html' ? <PinPanel disabled={disabled} /> : null}
       {pending.length ? <div className="card" style={{ borderColor: 'var(--accent)' }}>
         <div className="card-h"><h3>Bekleyen kullanıcılar ({pending.length})</h3><span className="small muted">Uygulamayı açmış, rol atanmamış</span></div>
         <div className="card-b flush"><table className="tbl"><thead><tr><th>Ad</th><th>İlk / son giriş</th><th /></tr></thead><tbody>
@@ -355,13 +357,14 @@ function DataTab() {
   const empty = !state.crids.length && !state.ideas.length;
   return (
     <div className="stack" style={{ gap: 16 }}>
+      {platform.mode === 'html' ? <StoragePanel /> : null}
       <div className="kv">
         <div>CRID</div><div>{state.crids.length}</div>
         <div>Fikir havuzu</div><div>{state.ideas.length}</div>
         <div>Alt detay</div><div>{state.subs.length}</div>
         <div>Üretim planı (araç-yıl)</div><div>{state.plans.length}</div>
         <div>Örnek kayıt</div><div>{sampleCount}</div>
-        <div>Depolama</div><div>{platform.mode === 'claude' ? 'claude.ai paylaşımlı veritabanı (kalıcı, canlı)' : platform.mode === 'server' ? 'Sunucu veritabanı (kalıcı, canlı)' : 'Tarayıcı (demo)'}</div>
+        <div>Depolama</div><div>{platform.mode === 'html' ? 'Bu bilgisayar (tarayıcı deposu)' + (platform.backend.file.status === 'ok' ? ' + veri dosyası' : '') : platform.mode === 'claude' ? 'claude.ai paylaşımlı veritabanı (kalıcı, canlı)' : platform.mode === 'server' ? 'Sunucu veritabanı (kalıcı, canlı)' : 'Tarayıcı (demo)'}</div>
       </div>
       {isIt ? <div className="row">
         {sampleCount ? <button className="btn danger" onClick={() => setConfirm('remove')}><Icon name="trash" />Örnek veriyi kaldır</button> : null}
@@ -439,6 +442,127 @@ function BrandingTab({ draft, upd, disabled }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- çevrimdışı HTML: depolama ve PIN ---------- */
+function useFileStatus(backend) {
+  const [st, setSt] = useState(() => ({ ...backend.file }));
+  useEffect(() => backend.onStatus(setSt), [backend]);
+  return st;
+}
+function StoragePanel() {
+  const { platform, toast, session } = useApp();
+  const be = platform.backend;
+  const st = useFileStatus(be);
+  const [busy, setBusy] = useState(false);
+  const [ask, setAsk] = useState(null); // {handle}
+  const isIt = session.role === 'it';
+  const stats = be.stats();
+  const run = async (fn, ok) => { setBusy(true); try { await fn(); if (ok) toast(ok, 'good'); } catch (e) { if (e?.name !== 'AbortError') toast(e.message || 'İşlem başarısız', 'bad'); } finally { setBusy(false); } };
+  const pickTypes = [{ description: 'CRID veri dosyası', accept: { 'application/json': ['.json'] } }];
+  const createFile = () => run(async () => {
+    const h = await window.showSaveFilePicker({ suggestedName: 'crid-veri.json', types: pickTypes });
+    await be.connect(h, 'create');
+  }, 'Veri dosyası oluşturuldu; değişiklikler artık bu dosyaya da kaydediliyor');
+  const openFile = () => run(async () => {
+    const [h] = await window.showOpenFilePicker({ types: pickTypes, multiple: false });
+    setAsk({ handle: h });
+  });
+  const backup = () => run(async () => {
+    const d = new Date(); const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+    await platform.saveFile(`crid-yedek-${stamp}.json`, new Blob([be.exportPack()], { type: 'application/json' }));
+  }, 'Yedek indirildi');
+  const restore = (file, mode) => run(async () => { await be.importPack(await file.text(), mode); }, mode === 'replace' ? 'Yedek geri yüklendi' : 'Yedek mevcut veriyle birleştirildi');
+  return (
+    <div className="card" data-testid="storage-panel">
+      <div className="card-h"><h3>Veri depolama</h3>
+        {st.status === 'ok' ? <Pill tone="good">Dosyaya bağlı</Pill> : st.status === 'needs-permission' ? <Pill tone="warn">İzin gerekli</Pill> : st.status === 'error' ? <Pill tone="bad">Hata</Pill> : <Pill tone="info">Bu bilgisayarda</Pill>}
+      </div>
+      <div className="card-b stack">
+        <div className="kv">
+          <div>Tarayıcı deposu</div><div>Her değişiklik otomatik kaydedilir · {stats.docs} kayıt · {Math.round(stats.bytes / 1024)} KB</div>
+          <div>Veri dosyası</div><div>{st.status === 'none' ? 'Bağlı değil' : <span className="mono">{st.name}</span>}{st.lastSync ? <span className="muted small"> · son eşitleme {new Date(st.lastSync).toLocaleTimeString('tr-TR')}</span> : null}</div>
+          {st.error ? <><div>Hata</div><div className="bad-t">{st.error}</div></> : null}
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>Veriler bu bilgisayarın tarayıcısında saklanır; internet veya sunucu gerekmez. Ekip olarak çalışmak ya da veriyi güvenceye almak için ortak bir klasöre (ör. ağ sürücüsü) bir <b>veri dosyası</b> bağlayın: her değişiklik dosyaya yazılır, dosyayı açan diğer kişilerin değişiklikleri kayıt bazında birleştirilir. Tarayıcı verisi silinirse dosya ya da yedekten geri dönebilirsiniz.</p>
+        {platform.fileApi ? (
+          <div className="row">
+            {st.status === 'none' ? <>
+              <button className="btn primary" disabled={busy} onClick={createFile}>Yeni veri dosyası oluştur</button>
+              <button className="btn" disabled={busy} onClick={openFile}>Mevcut veri dosyasını aç</button>
+            </> : <>
+              {st.status === 'needs-permission' ? <button className="btn primary" disabled={busy} onClick={() => run(() => be.reauthorize(), 'Veri dosyasına yeniden bağlanıldı')}>Dosya iznini ver</button> : null}
+              {st.status === 'ok' ? <button className="btn" disabled={busy} onClick={() => run(() => be.syncWithFile(), 'Eşitlendi')}>Şimdi eşitle</button> : null}
+              <button className="btn" disabled={busy} onClick={() => run(() => be.disconnect(), 'Veri dosyası bağlantısı kesildi; veriler bu bilgisayarda kalmaya devam ediyor')}>Bağlantıyı kes</button>
+            </>}
+          </div>
+        ) : <div className="banner warn">Veri dosyası bağlama bu tarayıcıda desteklenmiyor. Microsoft Edge veya Google Chrome kullanın; bu tarayıcıda yedek indirip yükleyerek çalışabilirsiniz.</div>}
+        <hr className="sep" />
+        <div className="row">
+          <button className="btn" disabled={busy} onClick={backup}><Icon name="down" />Yedek indir (.json)</button>
+          {isIt ? <>
+            <label className="btn"><Icon name="up" />Yedekten geri yükle<input type="file" hidden accept=".json,application/json" aria-label="Yedek dosyası" onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) setAsk({ restore: f }); }} /></label>
+          </> : null}
+        </div>
+      </div>
+      {ask?.handle ? (
+        <Modal title="Mevcut veri dosyası" size="narrow" onClose={() => setAsk(null)} footer={<>
+          <button className="btn" onClick={() => setAsk(null)}>Vazgeç</button>
+          <button className="btn" onClick={() => { const h = ask.handle; setAsk(null); run(() => be.connect(h, 'open-merge'), 'Dosya bağlandı ve veriler birleştirildi'); }}>Birleştir</button>
+          <button className="btn primary" onClick={() => { const h = ask.handle; setAsk(null); run(() => be.connect(h, 'open-replace'), 'Dosya bağlandı; dosyadaki veriler kullanılıyor'); }}>Dosyadaki veriyi kullan</button>
+        </>}>
+          <p style={{ marginTop: 0 }}><b>{ask.handle.name}</b> bağlanacak.</p>
+          <p className="muted">"Dosyadaki veriyi kullan": bu bilgisayardaki veri dosyadakiyle değiştirilir (ekibin ortak dosyasına katılırken önerilir). "Birleştir": iki taraftaki kayıtlar birleştirilir.</p>
+        </Modal>
+      ) : null}
+      {ask?.restore ? (
+        <Modal title="Yedekten geri yükle" size="narrow" onClose={() => setAsk(null)} footer={<>
+          <button className="btn" onClick={() => setAsk(null)}>Vazgeç</button>
+          <button className="btn" onClick={() => { const f = ask.restore; setAsk(null); restore(f, 'merge'); }}>Birleştir</button>
+          <button className="btn danger" onClick={() => { const f = ask.restore; setAsk(null); restore(f, 'replace'); }}>Tamamen değiştir</button>
+        </>}>
+          <p style={{ marginTop: 0 }}><b>{ask.restore.name}</b></p>
+          <p className="muted">"Tamamen değiştir": mevcut veri silinir, yedekteki veri yüklenir. "Birleştir": yedekteki kayıtlar mevcut veriye eklenir; aynı kayıtta yeni olan kalır.</p>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+function PinPanel({ disabled }) {
+  const { state, store, toast } = useApp();
+  const [edit, setEdit] = useState(null);
+  if (disabled) return null;
+  const users = state.master.users.filter((u) => u.active !== false);
+  const savePin = async (u, pin) => {
+    const m = clone(state.master);
+    const t = m.users.find((x) => x.id === u.id);
+    if (pin) t.pinHash = await pinHash(u.id, pin); else delete t.pinHash;
+    await store.saveMaster(m, pin ? `PIN tanımlandı: ${u.name}` : `PIN kaldırıldı: ${u.name}`);
+    toast(pin ? 'PIN kaydedildi' : 'PIN kaldırıldı', 'good');
+  };
+  return (
+    <div className="card" style={{ borderColor: 'var(--accent)' }}>
+      <div className="card-h"><h3>Giriş PIN'leri</h3><span className="small muted">Kullanıcı seçerken sorulur</span></div>
+      <div className="card-b flush">
+        <table className="tbl" data-testid="pin-table"><thead><tr><th>Kişi</th><th>Rol</th><th>PIN</th><th /></tr></thead><tbody>
+          {users.map((u) => (
+            <tr key={u.id}><td>{u.name}</td><td className="small">{ROLES.find((r) => r.key === u.role)?.label}</td><td>{u.pinHash ? <Pill tone="good">Tanımlı</Pill> : <span className="faint small">yok</span>}</td>
+              <td className="num nowrap"><button className="btn sm" onClick={() => setEdit({ u, pin: '' })}>{u.pinHash ? 'Değiştir' : 'PIN tanımla'}</button>{u.pinHash ? <button className="btn sm ghost" onClick={() => savePin(u, '')}>Kaldır</button> : null}</td></tr>
+          ))}
+        </tbody></table>
+        <div className="small muted" style={{ padding: 10 }}>Çevrimdışı sürümde PIN, yanlış kişinin yanlış rolle çalışmasını önler; kurumsal kimlik doğrulamanın yerini tutmaz. Hassas veride dosyayı yalnızca yetkili kişilerin erişebildiği bir klasörde tutun.</div>
+      </div>
+      {edit ? (
+        <Modal title={`${edit.u.name} — PIN`} size="narrow" onClose={() => setEdit(null)} footer={<>
+          <button className="btn" onClick={() => setEdit(null)}>Vazgeç</button>
+          <button className="btn primary" disabled={edit.pin.length < 4} onClick={async () => { await savePin(edit.u, edit.pin); setEdit(null); }}>Kaydet</button>
+        </>}>
+          <Field label="Yeni PIN" hint="En az 4 karakter" htmlFor="pin-new"><input id="pin-new" className="inp" type="password" value={edit.pin} onChange={(e) => setEdit({ ...edit, pin: e.target.value })} /></Field>
+        </Modal>
+      ) : null}
     </div>
   );
 }
